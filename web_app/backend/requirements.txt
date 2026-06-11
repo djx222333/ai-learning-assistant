@@ -1,0 +1,23 @@
+﻿# Web Framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# AI Engine (原 supervisor_agent 依赖)
+langgraph>=0.4.0
+langchain-openai>=0.3.0
+python-dotenv>=1.0.0
+ddgs>=9.0.0
+
+# RAG
+pymupdf
+sentence-transformers
+faiss-cpu
+
+# Database (SQLAlchemy 2.0 + Alembic)
+sqlalchemy>=2.0
+alembic>=1.13
+
+# Auth (预留)
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7

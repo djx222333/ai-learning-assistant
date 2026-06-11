@@ -1,0 +1,96 @@
+﻿# ============================================================
+# AI Learning Assistant - Docker Compose
+# ============================================================
+# Usage:
+#   docker compose up -d          # Start all services
+#   docker compose logs -f        # Follow logs
+#   docker compose down -v        # Stop and clean volumes
+# ============================================================
+
+services:
+
+  # ---- PostgreSQL 16 ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-postgres
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_assistant}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_assistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_assistant} -d ${POSTGRES_DB:-ai_assistant}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---- Redis 7 (for future caching) ----
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ---- FastAPI Backend ----
+  backend:
+    build:
+      context: .
+      dockerfile: web_app/backend/Dockerfile
+    container_name: ai-backend
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/web_app/backend/uploads
+      - rag_index:/app/supervisor_agent/rag_index
+      - backend_data:/app/web_app/backend/data
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ai_assistant}:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/${POSTGRES_DB:-ai_assistant}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-52428800}
+      UPLOAD_DIR: /app/web_app/backend/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---- React Frontend (Nginx) ----
+  frontend:
+    build:
+      context: .
+      dockerfile: web_app/frontend/Dockerfile
+    container_name: ai-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  uploads:
+    driver: local
+  rag_index:
+    driver: local
+  backend_data:
+    driver: local

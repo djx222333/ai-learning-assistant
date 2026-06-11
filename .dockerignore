@@ -1,0 +1,41 @@
+﻿# ============================================================
+# Docker ignore - speed up builds, exclude unnecessary files
+# ============================================================
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log

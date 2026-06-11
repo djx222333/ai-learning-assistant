@@ -1,0 +1,90 @@
+﻿# ============================================================
+# .gitignore — AI Learning Assistant
+# ============================================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+*.egg
+
+# ---- Virtual Environment ----
+.venv/
+venv/
+env/
+
+# ---- Environment Files ----
+# .env.example is tracked (template for developers)
+# All actual .env files are private
+.env
+.env.local
+.env.production
+
+# ---- Node.js ----
+node_modules/
+npm-debug.log*
+
+# ---- Build Output ----
+dist/
+build/
+
+# ---- Database ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Docker ----
+# Keep docker-compose.yml tracked (it's the dev environment definition)
+
+# ---- RAG / FAISS ----
+# FAISS index is rebuilt locally, not committed
+supervisor_agent/rag_index/*.faiss
+supervisor_agent/rag_index/*.json
+# supervisor_agent/rag_index/ directory is tracked for initialization
+!supervisor_agent/rag_index/.gitkeep
+
+# ---- Legacy JSON Data (replaced by PostgreSQL) ----
+web_app/backend/data/*.json
+!web_app/backend/data/.gitkeep
+
+# ---- Uploads ----
+web_app/backend/uploads/*
+!web_app/backend/uploads/.gitkeep
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Supervisor Agent runtime ----
+supervisor_agent/user_profile.json
+
+# ---- Test Artifacts ----
+test_*.db
+.pytest_cache/
+htmlcov/
+.coverage
+coverage/
+
+# ---- Internal Audit Documents ----
+AUDIT_*.md
+README_PRO.md
+verify_db.py
+migrate_data.py
+
+# ---- Generated Reports ----
+GITHUB_PUBLISH_REPORT.md
+AUDIT_*.md
+README_PRO.md
