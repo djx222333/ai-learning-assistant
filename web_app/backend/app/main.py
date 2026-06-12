@@ -1,28 +1,39 @@
 # -*- coding: utf-8 -*-
-"""FastAPI 应用入口（生产版）
-
-CORS 来源从 config.py 读取，支持 Railway 环境变量配置。
-日志级别通过 LOG_LEVEL 环境变量控制。
-"""
+"""FastAPI application entrypoint"""
+import logging
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import auth, chat, knowledge, plans, tasks, reports, conversations
 from app.core.config import settings
-import logging
 
-# 配置日志
+# === Startup logging ===
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
 )
+logger = logging.getLogger("startup")
+logger.info("FastAPI starting...")
+
+# === Lazy imports for heavy modules ===
+# agent_adapter imports agent_graph -> RAGEngine (SentenceTransformer)
+# which takes 10-50s to load. Defer to first request.
+_adapter = None
+
+def get_adapter():
+    global _adapter
+    if _adapter is None:
+        logger.info("Loading agent adapter (first request)...")
+        from app.services import agent_adapter
+        _adapter = agent_adapter
+        logger.info("Agent adapter loaded")
+    return _adapter
 
 app = FastAPI(
     title="AI Learning Assistant API",
-    description="AI 学习助手 Web 版后端服务",
     version="1.0.0",
 )
 
-# CORS - 允许生产域名（Vercel）和本地开发
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -31,21 +42,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat.router, prefix="/api")
+# Register routers (note: chat is lazy-loaded)
+from app.api.v1 import auth, knowledge, plans, tasks, reports, conversations
+app.include_router(auth.router, prefix="/api")
 app.include_router(knowledge.router, prefix="/api")
 app.include_router(plans.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(conversations.router, prefix="/api")
-app.include_router(auth.router, prefix="/api")
 
+# Chat router uses lazy adapter
+from app.api.v1 import chat
+app.include_router(chat.router, prefix="/api")
+
+@app.on_event("startup")
+async def startup():
+    logger.info("Startup event: app is ready")
+    logger.info(f"Database: {settings.DATABASE_URL[:30]}...")
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "version": "1.0.0"}
 
-
 @app.get("/")
 def root():
     return {"message": "AI Learning Assistant API is running"}
-

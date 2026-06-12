@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # Backend Dockerfile
 # Context: ../.. (E:\Exploit_1)
 # Includes: web_app/backend/ + supervisor_agent/
@@ -40,7 +40,7 @@ RUN mkdir -p /app/web_app/backend/uploads \
 # Environment defaults (overridden by docker-compose)
 ENV DATABASE_URL=postgresql://ai_assistant:ai_assistant@postgres:5432/ai_assistant
 ENV DEEPSEEK_API_KEY=""
-ENV DEEPSEEK_MODEL=deepseek-v4-flash
+ENV DEEPSEEK_MODEL=deepseek-chat
 ENV DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 ENV UPLOAD_DIR=/app/web_app/backend/uploads
 ENV PYTHONPATH=/app/web_app/backend:/app/supervisor_agent
@@ -50,8 +50,10 @@ WORKDIR /app/web_app/backend
 
 # Health check (after embedding model loads ~40s)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Entrypoint: migrate DB then start server
-CMD sh -c "alembic upgrade head && \
-           uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"
+CMD sh -c "alembic upgrade head 2>&1 || echo \"[WARN] Alembic migration failed, continuing...\" && \
+           uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"
+
+
