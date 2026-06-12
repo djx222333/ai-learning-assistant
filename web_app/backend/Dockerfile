@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # Backend Dockerfile
 # Context: ../.. (E:\Exploit_1)
 # Includes: web_app/backend/ + supervisor_agent/
@@ -28,6 +28,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Safety net: ensure PostgreSQL driver is always available
+# (multi-stage COPY may be stale in Railway build cache)
+RUN pip install --no-cache-dir psycopg2-binary>=2.9
+
 # Copy application code
 COPY supervisor_agent/ /app/supervisor_agent/
 COPY web_app/backend/ /app/web_app/backend/
@@ -53,7 +57,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Entrypoint: migrate DB then start server
-CMD sh -c "alembic upgrade head 2>&1 || echo \"[WARN] Alembic migration failed, continuing...\" && \
-           uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info"
-
-
+CMD python -c "import psycopg2; print('[OK] psycopg2 version:', psycopg2.__version__)" && \
+    alembic upgrade head 2>&1 || echo "[WARN] Alembic migration failed, continuing..." && \
+    uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info

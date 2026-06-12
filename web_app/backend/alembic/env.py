@@ -4,7 +4,7 @@
 支持 SQLite 开发 / PostgreSQL 生产。
 """
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 from alembic import context
 
 # Alembic Config 对象
@@ -40,10 +40,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """在线迁移（连接数据库执行）"""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    """在线迁移（从 settings 获取 DATABASE_URL 连接数据库执行）"""
+    from app.core.config import settings
+    from sqlalchemy import create_engine
+    connectable = create_engine(
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
@@ -59,3 +60,6 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
+
+
+
