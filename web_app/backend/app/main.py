@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """FastAPI application entrypoint"""
 import logging
 import sys
@@ -16,8 +16,6 @@ logger = logging.getLogger("startup")
 logger.info("FastAPI starting...")
 
 # === Lazy imports for heavy modules ===
-# agent_adapter imports agent_graph -> RAGEngine (SentenceTransformer)
-# which takes 10-50s to load. Defer to first request.
 _adapter = None
 
 def get_adapter():
@@ -42,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers (note: chat is lazy-loaded)
+# Register routers
 from app.api.v1 import auth, knowledge, plans, tasks, reports, conversations
 app.include_router(auth.router, prefix="/api")
 app.include_router(knowledge.router, prefix="/api")
@@ -57,12 +55,32 @@ app.include_router(chat.router, prefix="/api")
 
 @app.on_event("startup")
 async def startup():
+    """Startup: initialize database and log connection status"""
+    from app.database import get_db_type, get_engine
+    try:
+        engine = get_engine()
+        db_type = get_db_type()
+        logger.info("[DB] Startup complete - database: %s", db_type)
+    except Exception as e:
+        logger.warning("[DB] Startup database init failed: %s", e)
     logger.info("Startup event: app is ready")
-    logger.info(f"Database: {settings.DATABASE_URL[:30]}...")
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "1.0.0"}
+    from app.database import get_db_type
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "database": get_db_type(),
+    }
+
+@app.get("/db-status")
+def db_status():
+    from app.database import get_db_type
+    return {
+        "database": get_db_type(),
+        "status": "connected",
+    }
 
 @app.get("/")
 def root():

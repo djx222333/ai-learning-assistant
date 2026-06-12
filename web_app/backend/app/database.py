@@ -9,7 +9,7 @@
 """
 import logging
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from app.core.config import settings
 
@@ -24,30 +24,82 @@ class Base(DeclarativeBase):
     pass
 
 
+# 当前实际使用的数据库类型（在 get_engine() 第一次调用时设置）
+_db_type = None
+
+
+def get_db_type() -> str:
+    """返回当前实际使用的数据库类型: 'postgresql' | 'sqlite'"""
+    global _db_type
+    if _db_type is None:
+        get_engine()  # 触发初始化
+    return _db_type or "sqlite"
+
+
 def get_engine():
     """获取数据库引擎（首次调用时初始化）"""
-    global _engine
+    global _engine, _db_type
     if _engine is not None:
         return _engine
 
-    DATABASE_URL = settings.DATABASE_URL
-    logger.info("Initializing database engine: %s...", DATABASE_URL[:40])
+    # 1. 读取配置
+    original_url = settings.DATABASE_URL
+    DATABASE_URL = original_url
+
+    # 隐藏密码输出
+    safe_url = DATABASE_URL
+    if "@" in DATABASE_URL:
+        # postgresql://user:password@host:port/db -> postgresql://user:***@host:port/db
+        parts = DATABASE_URL.split("@")
+        creds = parts[0].rsplit(":", 1)
+        if len(creds) == 2:
+            safe_url = creds[0] + ":***@" + parts[1]
+    logger.info("[DB] DATABASE_URL: %s", safe_url)
 
     _connect_args = {}
+
+    # 2. 判断数据库类型
     if DATABASE_URL.startswith("sqlite"):
+        _db_type = "sqlite"
         _connect_args["check_same_thread"] = False
+        logger.info("[DB] Using SQLite")
+
     elif DATABASE_URL.startswith("postgresql"):
-        # 检查 PostgreSQL 驱动是否可用
+        _db_type = "postgresql"
+        logger.info("[DB] DATABASE_URL detected as PostgreSQL")
+
+        # 3. 检查 PostgreSQL 驱动
         try:
             import psycopg2  # noqa: F401
-            logger.info("psycopg2 driver available")
-        except ImportError:
-            logger.warning("psycopg2 not installed, falling back to SQLite")
+            logger.info("[DB] psycopg2 driver available (version: %s)", psycopg2.__version__)
+        except ImportError as e:
+            logger.warning("[DB] psycopg2 not installed: %s", e)
+            logger.warning("[DB] Falling back to SQLite")
+            _db_type = "sqlite"
             DATABASE_URL = "sqlite:///./app.db"
             _connect_args["check_same_thread"] = False
 
+        # 4. 测试 PostgreSQL 连接
+        if _db_type == "postgresql":
+            logger.info("[DB] Testing PostgreSQL connection...")
+            test_engine = create_engine(DATABASE_URL, echo=False)
+            try:
+                with test_engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                logger.info("[DB] PostgreSQL connection OK")
+                test_engine.dispose()
+            except Exception as e:
+                logger.warning("[DB] PostgreSQL connection FAILED: %s", e)
+                logger.warning("[DB] Falling back to SQLite")
+                _db_type = "sqlite"
+                DATABASE_URL = "sqlite:///./app.db"
+                _connect_args["check_same_thread"] = False
+            finally:
+                test_engine.dispose()
+
+    # 5. 创建引擎
     _engine = create_engine(DATABASE_URL, echo=False, connect_args=_connect_args)
-    logger.info("Database engine initialized successfully")
+    logger.info("[DB] Engine initialized: %s", _db_type)
     return _engine
 
 
@@ -117,4 +169,5 @@ class _EngineProxy:
 
 
 engine = _EngineProxy()
+
 
