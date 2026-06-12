@@ -21,3 +21,6 @@ alembic>=1.13
 # Auth (预留)
 python-jose[cryptography]>=3.3
 passlib[bcrypt]>=1.7
+
+# PostgreSQL Driver
+psycopg2-binary>=2.9
