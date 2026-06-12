@@ -1,36 +1,30 @@
 ﻿# ============================================================
 # Backend Dockerfile
-# Context: ../.. (E:\Exploit_1)
-# Includes: web_app/backend/ + supervisor_agent/
+# Single-stage build (eliminates multi-stage COPY issues)
+# Context: project root (E:\Exploit_1)
 # ============================================================
 
-# Stage 1: Builder - install Python packages
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-COPY web_app/backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Runtime
-FROM python:3.11-slim AS runtime
-
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy Python packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy requirements first (leverage Docker cache)
+COPY web_app/backend/requirements.txt /app/requirements.txt
 
-# Safety net: ensure PostgreSQL driver is always available
-# (multi-stage COPY may be stale in Railway build cache)
-RUN pip install --no-cache-dir psycopg2-binary>=2.9
+# Install Python dependencies
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# [DIAGNOSTIC] Verify psycopg2 installation
+RUN pip list 2>/dev/null | grep -i psycopg || echo "[WARN] psycopg2 NOT found in pip list"
+RUN python -c "import psycopg2; print('[DIAG] psycopg2 OK, version:', psycopg2.__version__)" 2>&1 || echo "[WARN] psycopg2 import FAILED"
+
+# Install FAISS (cpu) explicitly
+RUN pip install --no-cache-dir faiss-cpu
 
 # Copy application code
 COPY supervisor_agent/ /app/supervisor_agent/
@@ -41,7 +35,10 @@ RUN mkdir -p /app/web_app/backend/uploads \
              /app/web_app/backend/data \
              /app/supervisor_agent/rag_index
 
-# Environment defaults (overridden by docker-compose)
+# [DIAGNOSTIC] Final psycopg2 check
+RUN python -c "import psycopg2; print('[OK] psycopg2-binary', psycopg2.__version__, 'READY')"
+
+# Environment defaults (overridden by Railway)
 ENV DATABASE_URL=postgresql://ai_assistant:ai_assistant@postgres:5432/ai_assistant
 ENV DEEPSEEK_API_KEY=""
 ENV DEEPSEEK_MODEL=deepseek-chat
@@ -52,11 +49,14 @@ ENV SECRET_KEY=change-me-in-production
 
 WORKDIR /app/web_app/backend
 
-# Health check (after embedding model loads ~40s)
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Entrypoint: migrate DB then start server
-CMD python -c "import psycopg2; print('[OK] psycopg2 version:', psycopg2.__version__)" && \
-    alembic upgrade head 2>&1 || echo "[WARN] Alembic migration failed, continuing..." && \
+# Startup
+CMD echo "[BOOT] Starting container" && \
+    python -c "import psycopg2; print('[BOOT] psycopg2', psycopg2.__version__, 'OK')" && \
+    echo "[BOOT] Running migrations..." && \
+    alembic upgrade head 2>&1 || echo "[WARN] Migration failed, continuing..." && \
+    echo "[BOOT] Starting FastAPI on port ${PORT:-8000}" && \
     uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level info
