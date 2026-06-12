@@ -56,14 +56,29 @@ app.include_router(chat.router, prefix="/api")
 @app.on_event("startup")
 async def startup():
     """Startup: initialize database and log connection status"""
+    import urllib.parse
     from app.database import get_db_type, get_engine
+    from app.core.config import settings
+
+    logger.info("[BOOT] Startup event begin")
+    logger.info("[BOOT] DATABASE_URL present: %s", bool(settings.DATABASE_URL and settings.DATABASE_URL.strip()))
+    if settings.DATABASE_URL:
+        try:
+            r = urllib.parse.urlparse(settings.DATABASE_URL)
+            logger.info("[BOOT]   scheme: %s  host: %s  port: %s  db: %s",
+                        r.scheme, r.hostname, r.port, (r.path or "").lstrip("/"))
+        except Exception:
+            pass
+
     try:
         engine = get_engine()
         db_type = get_db_type()
-        logger.info("[DB] Startup complete - database: %s", db_type)
+        logger.info("[BOOT] Startup complete - database: %s", db_type)
     except Exception as e:
-        logger.warning("[DB] Startup database init failed: %s", e)
-    logger.info("Startup event: app is ready")
+        logger.warning("[BOOT] Startup database init failed: %s", e)
+        import traceback
+        logger.warning("[BOOT] Traceback:\n%s", traceback.format_exc())
+    logger.info("[BOOT] Startup event finished")
 
 @app.get("/health")
 def health_check():
@@ -76,10 +91,55 @@ def health_check():
 
 @app.get("/db-status")
 def db_status():
-    from app.database import get_db_type
+    from app.database import get_db_type, get_engine
+    from app.core.config import settings
+    import urllib.parse
+
+    url = settings.DATABASE_URL
+    info = {
+        "present": bool(url and url.strip()),
+        "url_prefix": (url[:30] + "...") if url and len(url) > 40 else (url or "empty"),
+    }
+    if url and "@" in url:
+        parts = url.split("@")
+        creds = parts[0].rsplit(":", 1)
+        if len(creds) == 2:
+            info["url_prefix"] = creds[0] + ":***@" + parts[1]
+
+    # Parse URL
+    parsed = {}
+    try:
+        r = urllib.parse.urlparse(url or "")
+        parsed["scheme"] = r.scheme
+        parsed["host"] = r.hostname
+        parsed["port"] = r.port
+        parsed["database"] = (r.path or "").lstrip("/")
+        params = urllib.parse.parse_qs(r.query)
+        parsed["sslmode"] = params.get("sslmode", [None])[0]
+    except Exception:
+        pass
+
+    engine_ok = False
+    connection_ok = False
+    error = None
+    try:
+        e = get_engine()
+        engine_ok = True
+        from sqlalchemy import text
+        with e.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            connection_ok = True
+    except Exception as ex:
+        error = str(ex)[:200]
+
     return {
-        "database": get_db_type(),
-        "status": "connected",
+        "database_type": get_db_type(),
+        "database_url_present": info["present"],
+        "database_url_masked": info["url_prefix"],
+        "url_details": parsed,
+        "engine_initialized": engine_ok,
+        "connection_ok": connection_ok,
+        "error": error,
     }
 
 @app.get("/")
