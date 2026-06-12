@@ -221,7 +221,22 @@ def _diagnose_db_env(vars_report: list[dict]) -> str:
     return "A: Railway NOT injecting any PostgreSQL variable - check if Neon/PostgreSQL plugin is attached"
 
 
+
+@app.get("/llm-status")
+def llm_status():
+    """诊断: 检查 LLM 配置状态"""
+    from app.core.config import settings
+    key = settings.DEEPSEEK_API_KEY
+    return {
+        "provider": "DeepSeek",
+        "api_key_present": bool(key and key.strip()),
+        "api_key_valid": bool(key and "xxx" not in key and key.strip()),
+        "model": settings.DEEPSEEK_MODEL,
+        "base_url": settings.DEEPSEEK_BASE_URL,
+    }
+
 @app.get("/")
 def root():
     return {"message": "AI Learning Assistant API is running"}
+
 

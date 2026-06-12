@@ -151,6 +151,8 @@ def _llm_generate_plan(goal: str, duration_weeks: int) -> dict:
         ValueError: LLM 返回内容无法解析为 JSON
     """
     llm = get_llm()
+    if llm is None:
+        return {"error": "LLM not available - check API key"}
 
     user_prompt = (
         f"学习目标：{goal}\n"

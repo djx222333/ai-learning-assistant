@@ -45,7 +45,10 @@ PLANNER_PROMPT = """?????????????
 
 def generate_plan(goal, duration_weeks=8, user_id=None):
     """LLM ???? + DB ???"""
-    response = get_llm().invoke([
+    llm = get_llm()
+    if llm is None:
+        return None
+    response = llm.invoke([
         {"role": "system", "content": PLANNER_PROMPT},
         {"role": "user", "content": f"?????{goal}\n?????{duration_weeks}?"},
     ])

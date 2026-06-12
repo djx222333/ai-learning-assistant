@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """agent_graph.py - Supervisor + Multi-Agent Architecture"""
 
 from typing import Literal
@@ -13,6 +13,7 @@ from ddgs import DDGS
 from rag_engine import RAGEngine
 from dotenv import load_dotenv
 import os
+import logging
 
 load_dotenv()
 
@@ -20,16 +21,16 @@ load_dotenv()
 # ============================================================
 # Part 1: State
 #
-# SupervisorState 扩展 MessagesState，除了 messages 字段外
-# 还多了一个 next_agent 字段，用来记录 Supervisor 决定
-# 下一步要调用哪个子 Agent
+# SupervisorState 閹碘晛鐫?MessagesState閿涘矂娅庢禍?messages 鐎涙顔屾径?
+# 鏉╂ê顦挎禍鍡曠娑?next_agent 鐎涙顔岄敍宀€鏁ら弶銉唶瑜?Supervisor 閸愬啿鐣?
+# 娑撳绔村銉洣鐠嬪啰鏁ら崫顏冮嚋鐎?Agent
 # ============================================================
 
 
 class SupervisorState(MessagesState):
-    """Supervisor 状态
-    messages:   对话历史（所有子 Agent 共享）
-    next_agent: Supervisor 决定的下一个 Agent 名字
+    """Supervisor 閻樿埖鈧?
+    messages:   鐎电鐦介崢鍡楀蕉閿涘牊澧嶉張澶婄摍 Agent 閸忓彉闊╅敍?
+    next_agent: Supervisor 閸愬啿鐣鹃惃鍕瑓娑撯偓娑?Agent 閸氬秴鐡?
     """
     next_agent: str
 
@@ -37,9 +38,9 @@ class SupervisorState(MessagesState):
 # ============================================================
 # Part 2: Tools
 #
-# 这些工具可以被子 Agent 调用
-# Code Agent 能调 calculator + read_file
-# English/Career Agent 只能调 read_file
+# 鏉╂瑤绨哄銉ュ徔閸欘垯浜掔悮顐㈢摍 Agent 鐠嬪啰鏁?
+# Code Agent 閼冲€熺殶 calculator + read_file
+# English/Career Agent 閸欘亣鍏樼拫?read_file
 # ============================================================
 
 
@@ -98,11 +99,11 @@ def web_search(query: str) -> str:
 
 
 # ---------- Long-Term Memory Tools ----------
-# 这两个工具让 Agent 能读写 user_profile.json
-# 实现跨会话的用户画像持久化
+# 鏉╂瑤琚辨稉顏勪紣閸忕柉顔€ Agent 閼冲€燁嚢閸?user_profile.json
+# 鐎圭偟骞囩捄銊ょ窗鐠囨繄娈戦悽銊﹀煕閻㈣鍎氶幐浣风畽閸?
 
-# read_profile: Agent 用来读取用户背景信息
-# update_profile: Agent 在了解到新信息时用来更新
+# read_profile: Agent 閻劍娼电拠璇插絿閻劍鍩涢懗灞炬珯娣団剝浼?
+# update_profile: Agent 閸︺劋绨＄憴锝呭煂閺傞淇婇幁顖涙閻劍娼甸弴瀛樻煀
 
 
 @tool
@@ -183,13 +184,13 @@ def rag_search(query: str, top_k: int = 3) -> str:
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 
-def get_llm(model="deepseek-v4-flash"):
+def get_llm(model="deepseek-chat"):
     if not DEEPSEEK_API_KEY or "xxx" in DEEPSEEK_API_KEY:
         raise ValueError("Invalid API key")
     return ChatOpenAI(model=model, api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com/v1", temperature=0.7)
 
 
-# 到这步先停，下一步创建 3 个子 Agent
+# 閸掓媽绻栧銉ュ帥閸嬫粣绱濇稉瀣╃濮濄儱鍨卞?3 娑擃亜鐡?Agent
 
 # ============================================================
 # Part 4: Create 3 Sub-Agents
@@ -226,13 +227,13 @@ career_agent = create_react_agent(
 )
 
 # ---------- Search Agent ----------
-# 职责：联网搜索实时信息
-# 工具：web_search
+# 閼卞矁鐭楅敍姘充粓缂冩垶鎮崇槐銏犵杽閺冩湹淇婇幁?
+# 瀹搞儱鍙块敍姝竐b_search
 #
-# 为什么 Search Agent 要用 create_react_agent 而不是普通函数？
-#   搜索不是调一次函数就结束的事情。
-#   可能第一次搜的结果不够精确，需要调整关键词再搜。
-#   create_react_agent 提供了 agent → tools → agent 的循环能力。
+# 娑撹桨绮堟稊?Search Agent 鐟曚胶鏁?create_react_agent 閼板奔绗夐弰顖涙珮闁艾鍤遍弫甯吹
+#   閹兼粎鍌ㄦ稉宥嗘Ц鐠嬪啩绔村▎鈥冲毐閺佹澘姘ㄧ紒鎾存将閻ㄥ嫪绨ㄩ幆鍛偓?
+#   閸欘垵鍏樼粭顑跨濞嗏剝鎮抽惃鍕波閺嬫粈绗夋径鐔虹翱绾噯绱濋棁鈧憰浣界殶閺佹潙鍙ч柨顔跨槤閸愬秵鎮抽妴?
+#   create_react_agent 閹绘劒绶垫禍?agent 閳?tools 閳?agent 閻ㄥ嫬鎯婇悳顖濆厴閸旀稏鈧?
 
 search_prompt = SystemMessage(content="You are a search specialist. Use web_search to find current information. If results are not clear, try different keywords.")
 search_agent = create_react_agent(
@@ -242,12 +243,12 @@ search_agent = create_react_agent(
 )
 
 # ---------- Research Agent ----------
-# 职责：搜集资料 + 整理资料 + 输出结构化报告
-# 工具：web_search（搜索各种来源）+ read_file（读本地参考文件）
+# 閼卞矁鐭楅敍姘偝闂嗗棜绁弬?+ 閺佸鎮婄挧鍕灐 + 鏉堟挸鍤紒鎾寸€崠鏍ㄥГ閸?
+# 瀹搞儱鍙块敍姝竐b_search閿涘牊鎮崇槐銏犳倗缁夊秵娼靛┃鎰剁礆+ read_file閿涘牐顕伴張顒€婀撮崣鍌濃偓鍐╂瀮娴犺绱?
 #
-# 与 Search Agent 的区别：
-#   Search: 搜一次 → 直接回答
-#   Research: 多次搜索 → 交叉验证 → 读文件 → 输出报告
+# 娑?Search Agent 閻ㄥ嫬灏崚顐窗
+#   Search: 閹兼粈绔村▎?閳?閻╁瓨甯撮崶鐐电摕
+#   Research: 婢舵碍顐奸幖婊呭偍 閳?娴溿倕寮舵宀冪槈 閳?鐠囩粯鏋冩禒?閳?鏉堟挸鍤幎銉ユ啞
 
 research_prompt = SystemMessage(content="You are a research analyst. Use web_search to gather information from multiple sources, and read_file to examine local reference materials. Organize your findings into a structured report with sections, key findings, and source citations. If initial search results are insufficient, try different search keywords to get comprehensive coverage.")
 research_agent = create_react_agent(
@@ -258,17 +259,17 @@ research_agent = create_react_agent(
 
 
 # ---------- RAG Agent ----------
-# 职责：文档问答（上传 PDF → 检索 → 回答）
-# 工具：ingest_pdf（上传建索引）+ rag_search（检索问答）
+# 閼卞矁鐭楅敍姘瀮濡楋綁妫剁粵鏃撶礄娑撳﹣绱?PDF 閳?濡偓缁?閳?閸ョ偟鐡熼敍?
+# 瀹搞儱鍙块敍姝﹏gest_pdf閿涘牅绗傛导鐘茬紦缁便垹绱╅敍? rag_search閿涘牊顥呯槐銏ゆ６缁涙棑绱?
 #
-# 与 Search Agent 的区别：
-#   Search: 搜互联网
-#   RAG: 搜你自己上传的文档
+# 娑?Search Agent 閻ㄥ嫬灏崚顐窗
+#   Search: 閹兼粈绨伴懕鏃傜秹
+#   RAG: 閹兼粈缍橀懛顏勭箒娑撳﹣绱堕惃鍕瀮濡?
 #
-# 与 Research Agent 的区别：
-#   Research: 多来源调研，输出报告
-#   RAG: 基于特定文档的精准问答
-rag_prompt = SystemMessage(content="You are a document Q&A assistant. When the user provides a PDF file, use ingest_pdf to index it. When they ask questions, use rag_search to find relevant passages and answer based on the document. Always cite the source chunks.")
+# 娑?Research Agent 閻ㄥ嫬灏崚顐窗
+#   Research: 婢舵碍娼靛┃鎰殶閻棑绱濇潏鎾冲毉閹躲儱鎲?
+#   RAG: 閸╄桨绨悧鐟扮暰閺傚洦銆傞惃鍕翱閸戝棝妫剁粵?
+rag_prompt = SystemMessage(content="You are a document Q&A assistant. When the user provides a PDF file, use ingest_pdf to index it. When they ask questions, use rag_search to find relevant passages and answer based on the document. Always cite the source chunks. IMPORTANT: If the knowledge base is empty or no relevant content is found, answer the question based on your own knowledge. Never refuse to answer.")
 rag_agent = create_react_agent(
     model=get_llm().bind_tools([ingest_pdf, rag_search]),
     tools=[ingest_pdf, rag_search],
@@ -282,6 +283,7 @@ rag_agent = create_react_agent(
 
 
 def supervisor_node(state: SupervisorState) -> dict:
+    _ensure_agents()
     last = state["messages"][-1]
     question = last.content
     llm = get_llm()
@@ -306,26 +308,33 @@ def supervisor_node(state: SupervisorState) -> dict:
 # ============================================================
 # Part 5b: Planner Node
 #
-# Planner 接收复杂问题，拆成多个子任务，依次调用不同的 Agent，
-# 收集结果并汇总成最终回答。
+# Planner 閹恒儲鏁规径宥嗘絽闂傤噣顣介敍灞惧閹存劕顦挎稉顏勭摍娴犺濮熼敍灞肩贩濞喡ょ殶閻劋绗夐崥宀€娈?Agent閿?
+# 閺€鍫曟肠缂佹挻鐏夐獮鑸电湽閹粯鍨氶張鈧紒鍫濇礀缁涙柣鈧?
 #
-# 为什么 Planner 是普通函数而不是 create_react_agent？
-#   Planner 需要遍历任务列表、依次调子 Agent、汇总结果——
-#   这些是编排逻辑，不是 ReAct 循环。普通函数更适合。
+# 娑撹桨绮堟稊?Planner 閺勵垱娅橀柅姘毐閺佹媽鈧奔绗夐弰?create_react_agent閿?
+#   Planner 闂団偓鐟曚線浜堕崢鍡曟崲閸斺€冲灙鐞涖劊鈧椒绶峰▎陇鐨熺€?Agent閵嗕焦鐪归幀鑽ょ波閺嬫壕鈧柡鈧?
+#   鏉╂瑤绨洪弰顖滅椽閹烘帡鈧槒绶敍灞肩瑝閺?ReAct 瀵邦亞骞嗛妴鍌涙珮闁艾鍤遍弫鐗堟纯闁倸鎮庨妴?
 # ============================================================
 
 
-AGENT_MAP_PLAN = {
-    "code": code_agent,
-    "english": english_agent,
-    "career": career_agent,
-    "search": search_agent,
-    "research": research_agent,
-    "rag": rag_agent,
-}
+AGENT_MAP_PLAN = {}
+
+def _get_agent_map():
+    if not AGENT_MAP_PLAN:
+        _ensure_agents()
+        AGENT_MAP_PLAN.update({
+            "code": code_agent,
+            "english": english_agent,
+            "career": career_agent,
+            "search": search_agent,
+            "research": research_agent,
+            "rag": rag_agent,
+        })
+    return AGENT_MAP_PLAN
 
 
 def planner_node(state: SupervisorState) -> dict:
+    _ensure_agents()
     """Planner: receive complex question, split tasks, collect results"""
     import json
     from langchain_core.messages import HumanMessage, AIMessage
@@ -333,7 +342,7 @@ def planner_node(state: SupervisorState) -> dict:
     question = state["messages"][-1].content
     llm = get_llm()
 
-    # Step 1: LLM 拆解任务
+    # Step 1: LLM 閹峰棜袙娴犺濮?
     prompt = f"""Break this request into subtasks.
     Each subtask is assigned to ONE agent:
     - code: Python programming
@@ -350,7 +359,7 @@ def planner_node(state: SupervisorState) -> dict:
 
     resp = llm.invoke(prompt)
 
-    # Step 2: 解析任务列表
+    # Step 2: 鐟欙絾鐎芥禒璇插閸掓銆?
     text = resp.content.strip()
     # Remove markdown code fences if present
     if "`" in text:
@@ -364,12 +373,12 @@ def planner_node(state: SupervisorState) -> dict:
     tasks = tasks[:4]
 
 
-    # Step 3: 依次执行每个子任务
+    # Step 3: 娓氭繃顐奸幍褑顢戝В蹇庨嚋鐎涙劒鎹㈤崝?
     results = []
     for t in tasks:
         agent_name = t.get("agent", "code")
         task_desc = t.get("task", question)
-        agent = AGENT_MAP_PLAN.get(agent_name)
+        agent = _get_agent_map().get(agent_name)
         if agent is None:
             continue
         try:
@@ -379,7 +388,7 @@ def planner_node(state: SupervisorState) -> dict:
         except Exception as e:
             results.append(f"[{agent_name.upper()}] Error: {e}")
 
-    # Step 4: 汇总结果
+    # Step 4: 濮瑰洦鈧崵绮ㄩ弸?
     all_results = "\n\n---\n\n".join(results)
     final_prompt = f"""Consolidate these results into a coherent response.
     Original question: {question}
@@ -407,26 +416,26 @@ def route_to_agent(state: SupervisorState) -> str:
 # ============================================================
 # Part 7: Build Graph
 #
-# 图的结构：
+# 閸ュ墽娈戠紒鎾寸€敍?
 #   START
 #     |
 #     v
 #   supervisor_node (classify)
 #     |
 #     v (conditional)
-#   ┌──────┼──────┐
+#   閳瑰备鏀㈤埞鈧埞鈧埞鈧埞鈧埞鈧埞灏栨敘閳光偓閳光偓閳光偓閳光偓閳光偓閳?
 #   v      v      v
 #  code  english career
 #  agent  agent   agent
 #   |      |      |
-#   └──────┼──────┘
+#   閳规柡鏀㈤埞鈧埞鈧埞鈧埞鈧埞鈧埞灏栨敘閳光偓閳光偓閳光偓閳光偓閳光偓閳?
 #          v
 #         END
 #
-# 注意：code_agent / english_agent / career_agent 是
-# 用 create_react_agent 创建的子图
-# 它们内部有各自的 agent -> tool -> agent 循环
-# 但在 Supervisor 图中，它们只是一个节点
+# 濞夈劍鍓伴敍姝漮de_agent / english_agent / career_agent 閺?
+# 閻?create_react_agent 閸掓稑缂撻惃鍕摍閸?
+# 鐎瑰啩婊戦崘鍛村劥閺堝鎮囬懛顏嗘畱 agent -> tool -> agent 瀵邦亞骞?
+# 娴ｅ棗婀?Supervisor 閸ュ彞鑵戦敍灞界暊娴狀剙褰ч弰顖欑娑擃亣濡悙?
 # ============================================================
 
 
@@ -477,3 +486,6 @@ def run(question: str) -> str:
         "next_agent": "",
     }, config)
     return result["messages"][-1].content
+
+
+
