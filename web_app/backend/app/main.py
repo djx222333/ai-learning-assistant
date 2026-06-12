@@ -13,7 +13,8 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 logger = logging.getLogger("startup")
-logger.info("FastAPI starting...")
+print("[BOOT] COMMIT=fix-lazy-load")
+print("[BOOT] MAIN IMPORT START")
 
 # === Lazy imports for heavy modules ===
 _adapter = None
@@ -238,5 +239,7 @@ def llm_status():
 @app.get("/")
 def root():
     return {"message": "AI Learning Assistant API is running"}
+
+
 
 

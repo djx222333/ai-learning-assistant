@@ -12,8 +12,7 @@ _orig = os.getcwd()
 os.chdir(SUPERVISOR_DIR)
 try:
     import agent_graph as _ag
-    _ag.get_graph()  # lazy init
-    graph = _ag.graph if _ag.graph else _ag.get_graph()
+    graph = _ag.get_graph()  # lazy init, returns the graph
     HumanMessage = _ag.HumanMessage
     MemorySaver = _ag.MemorySaver
 finally:

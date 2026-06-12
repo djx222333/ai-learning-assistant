@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """agent_graph.py - Supervisor + Multi-Agent Architecture"""
 
 from typing import Literal
@@ -14,6 +14,8 @@ from rag_engine import RAGEngine
 from dotenv import load_dotenv
 import os
 import logging
+
+print("[BOOT] agent_graph imported")
 
 load_dotenv()
 
@@ -185,8 +187,11 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 
 def get_llm(model="deepseek-chat"):
+    print("[BOOT] get_llm called")
+    print("[BOOT] get_llm called")
     if not DEEPSEEK_API_KEY or "xxx" in DEEPSEEK_API_KEY:
-        raise ValueError("Invalid API key")
+        _logger.warning("DeepSeek API key missing, LLM unavailable")
+        return None
     return ChatOpenAI(model=model, api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com/v1", temperature=0.7)
 
 
@@ -204,27 +209,15 @@ def get_llm(model="deepseek-chat"):
 
 # ---------- Code Agent ----------
 code_prompt = SystemMessage(content="You are a Python tutor. Use read_profile to learn the user skill level before teaching. Use calculator for math. Use read_file for code files. Use update_profile to track progress.")
-code_agent = create_react_agent(
-    model=get_llm().bind_tools([calculator, read_file, read_profile, update_profile]),
-    tools=[calculator, read_file, read_profile, update_profile],
-    prompt=code_prompt,
-)
+code_agent = None
 
 # ---------- English Agent ----------
 english_prompt = SystemMessage(content="You are an English teacher. Provide grammar explanations and examples.")
-english_agent = create_react_agent(
-    model=get_llm().bind_tools([read_file]),
-    tools=[read_file],
-    prompt=english_prompt,
-)
+english_agent = None
 
 # ---------- Career Agent ----------
 career_prompt = SystemMessage(content="You are a study planning consultant. Before making a plan, use read_profile to learn about the user background. After the user shares personal info, use update_profile to save it. Provide plans with timelines.")
-career_agent = create_react_agent(
-    model=get_llm().bind_tools([read_file, read_profile, update_profile]),
-    tools=[read_file, read_profile, update_profile],
-    prompt=career_prompt,
-)
+career_agent = None
 
 # ---------- Search Agent ----------
 # 閼卞矁鐭楅敍姘充粓缂冩垶鎮崇槐銏犵杽閺冩湹淇婇幁?
@@ -236,11 +229,7 @@ career_agent = create_react_agent(
 #   create_react_agent 閹绘劒绶垫禍?agent 閳?tools 閳?agent 閻ㄥ嫬鎯婇悳顖濆厴閸旀稏鈧?
 
 search_prompt = SystemMessage(content="You are a search specialist. Use web_search to find current information. If results are not clear, try different keywords.")
-search_agent = create_react_agent(
-    model=get_llm().bind_tools([web_search]),
-    tools=[web_search],
-    prompt=search_prompt,
-)
+search_agent = None
 
 # ---------- Research Agent ----------
 # 閼卞矁鐭楅敍姘偝闂嗗棜绁弬?+ 閺佸鎮婄挧鍕灐 + 鏉堟挸鍤紒鎾寸€崠鏍ㄥГ閸?
@@ -251,11 +240,7 @@ search_agent = create_react_agent(
 #   Research: 婢舵碍顐奸幖婊呭偍 閳?娴溿倕寮舵宀冪槈 閳?鐠囩粯鏋冩禒?閳?鏉堟挸鍤幎銉ユ啞
 
 research_prompt = SystemMessage(content="You are a research analyst. Use web_search to gather information from multiple sources, and read_file to examine local reference materials. Organize your findings into a structured report with sections, key findings, and source citations. If initial search results are insufficient, try different search keywords to get comprehensive coverage.")
-research_agent = create_react_agent(
-    model=get_llm().bind_tools([web_search, read_file]),
-    tools=[web_search, read_file],
-    prompt=research_prompt,
-)
+search_agent = None
 
 
 # ---------- RAG Agent ----------
@@ -270,11 +255,7 @@ research_agent = create_react_agent(
 #   Research: 婢舵碍娼靛┃鎰殶閻棑绱濇潏鎾冲毉閹躲儱鎲?
 #   RAG: 閸╄桨绨悧鐟扮暰閺傚洦銆傞惃鍕翱閸戝棝妫剁粵?
 rag_prompt = SystemMessage(content="You are a document Q&A assistant. When the user provides a PDF file, use ingest_pdf to index it. When they ask questions, use rag_search to find relevant passages and answer based on the document. Always cite the source chunks. IMPORTANT: If the knowledge base is empty or no relevant content is found, answer the question based on your own knowledge. Never refuse to answer.")
-rag_agent = create_react_agent(
-    model=get_llm().bind_tools([ingest_pdf, rag_search]),
-    tools=[ingest_pdf, rag_search],
-    prompt=rag_prompt,
-)
+rag_agent = None
 
 # ============================================================
 # Part 5: Supervisor Node
@@ -475,7 +456,7 @@ def build_graph() -> StateGraph:
     return builder.compile(checkpointer=memory)
 
 
-graph = build_graph()
+
 THREAD_ID = "supervisor-main"
 
 
@@ -487,5 +468,16 @@ def run(question: str) -> str:
     }, config)
     return result["messages"][-1].content
 
+# Lazy graph
+_graph_instance = None
 
+def get_graph():
+    print("[BOOT] get_graph called")
+    print("[BOOT] get_graph called")
+    global _graph_instance
+    if _graph_instance is None:
+        _ensure_agents()
+        _graph_instance = build_graph()
+    return _graph_instance
 
+graph = None
