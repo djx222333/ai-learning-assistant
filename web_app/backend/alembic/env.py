@@ -43,9 +43,18 @@ def run_migrations_online() -> None:
     """在线迁移（从 settings 获取 DATABASE_URL 连接数据库执行）"""
     from app.core.config import settings
     from sqlalchemy import create_engine
+
+    url = settings.DATABASE_URL
+
+    # Auto-add sslmode=require (Neon PostgreSQL required)
+    if url.startswith("postgresql") and "sslmode" not in url:
+        separator = "&" if "?" in url else "?"
+        url = url + separator + "sslmode=require"
+
     connectable = create_engine(
-        settings.DATABASE_URL,
+        url,
         poolclass=pool.NullPool,
+        connect_args={"connect_timeout": 10},
     )
     with connectable.connect() as connection:
         context.configure(
@@ -60,6 +69,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
-
-

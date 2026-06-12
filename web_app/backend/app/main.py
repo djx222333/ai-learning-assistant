@@ -102,11 +102,10 @@ async def startup():
 
 @app.get("/health")
 def health_check():
-    from app.database import get_db_type
+    """Health Check — 必须在 100ms 内返回，不依赖任何外部服务"""
     return {
         "status": "ok",
         "version": "1.0.0",
-        "database": get_db_type(),
     }
 
 @app.get("/db-status")
@@ -225,3 +224,4 @@ def _diagnose_db_env(vars_report: list[dict]) -> str:
 @app.get("/")
 def root():
     return {"message": "AI Learning Assistant API is running"}
+
