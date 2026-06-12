@@ -58,10 +58,29 @@ async def startup():
     """Startup: initialize database and log connection status"""
     import urllib.parse
     from app.database import get_db_type, get_engine
-    from app.core.config import settings
+    from app.core.config import settings, check_env_vars, get_database_url_from_any_env
 
-    logger.info("[BOOT] Startup event begin")
-    logger.info("[BOOT] DATABASE_URL present: %s", bool(settings.DATABASE_URL and settings.DATABASE_URL.strip()))
+    logger.info("[BOOT] ====== Environment Variable Check ======")
+
+    # Check ALL possible PostgreSQL env vars
+    env_vars = check_env_vars()
+    for ev in env_vars:
+        if ev["exists"]:
+            logger.info("[BOOT]   %s = %s", ev["name"], ev["value_masked"])
+        else:
+            logger.info("[BOOT]   %s = (not set)", ev["name"])
+
+    # Check what DATABASE_URL is actually used
+    logger.info("[BOOT] settings.DATABASE_URL = %s", settings.DATABASE_URL[:50] + "..." if len(settings.DATABASE_URL) > 50 else settings.DATABASE_URL or "(empty string)")
+    logger.info("[BOOT] settings.DATABASE_URL present: %s", bool(settings.DATABASE_URL and settings.DATABASE_URL.strip()))
+
+    # Try to find PostgreSQL URL from any env var
+    pg_url = get_database_url_from_any_env()
+    if pg_url:
+        logger.info("[BOOT] PostgreSQL URL found via env: %s", pg_url[:40] + "...")
+    else:
+        logger.info("[BOOT] No PostgreSQL URL found in any env var")
+
     if settings.DATABASE_URL:
         try:
             r = urllib.parse.urlparse(settings.DATABASE_URL)
@@ -70,6 +89,7 @@ async def startup():
         except Exception:
             pass
 
+    logger.info("[BOOT] ====== DB Initialization ======")
     try:
         engine = get_engine()
         db_type = get_db_type()
@@ -141,6 +161,66 @@ def db_status():
         "connection_ok": connection_ok,
         "error": error,
     }
+
+@app.get("/env-check")
+def env_check():
+    """诊断: 检查所有可能的 PostgreSQL 环境变量
+    
+    Railway 可能使用以下任一变量注入数据库连接:
+      - DATABASE_URL (标准)
+      - POSTGRES_URL (Railway 早期)
+      - POSTGRESQL_URL
+      - PGHOST + PGPORT + PGDATABASE + PGUSER + PGPASSWORD (独立参数)
+    """
+    from app.core.config import check_env_vars, get_database_url_from_any_env, POSTGRES_ENV_VARS
+
+    # 1. 逐个检查环境变量
+    vars_report = check_env_vars()
+
+    # 2. 尝试从任意变量构建 DATABASE_URL
+    constructed_url = get_database_url_from_any_env()
+
+    # 3. 当前 settings 实际使用的 URL
+    from app.core.config import settings
+    current_url = settings.DATABASE_URL
+
+    # 4. 检查 Dockerfile 是否可能覆盖
+    dockerfile_default = current_url == "sqlite:///./app.db"
+
+    return {
+        "environment_variables": vars_report,
+        "constructed_postgresql_url_exists": constructed_url is not None,
+        "constructed_postgresql_url": (constructed_url[:40] + "...") if constructed_url else None,
+        "current_settings_database_url": (current_url[:40] + "...") if current_url and len(current_url) > 40 else (current_url or "(empty)"),
+        "likely_using_dockerfile_default": dockerfile_default,
+        "conclusion": _diagnose_db_env(vars_report),
+    }
+
+
+def _diagnose_db_env(vars_report: list[dict]) -> str:
+    """根据环境变量检查结果给出诊断结论"""
+    # 检查是否有任何 PostgreSQL URL 变量
+    has_database_url = any(
+        v["exists"] for v in vars_report
+        if v["name"] in ("DATABASE_URL",)
+    )
+    has_postgres_url = any(
+        v["exists"] for v in vars_report
+        if v["name"] in ("POSTGRES_URL", "POSTGRESQL_URL", "NEON_DATABASE_URL", "RAILWAY_DATABASE_URL")
+    )
+    has_pg_host = any(
+        v["exists"] for v in vars_report
+        if v["name"] in ("PGHOST",)
+    )
+
+    if has_database_url:
+        return "A: DATABASE_URL is set by Railway"
+    if has_postgres_url:
+        return "B: POSTGRES_URL/POSTGRESQL_URL is set but config.py reads DATABASE_URL (variable name mismatch)"
+    if has_pg_host:
+        return "B: PGHOST is set but config reads DATABASE_URL (need to combine PGHOST+PGPORT+PGDATABASE...)"
+    return "A: Railway NOT injecting any PostgreSQL variable - check if Neon/PostgreSQL plugin is attached"
+
 
 @app.get("/")
 def root():
