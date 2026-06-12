@@ -153,7 +153,16 @@ def update_profile(key: str, value: str) -> str:
 
 # ============================================================
 # RAG Engine (global instance, loaded once)
-rag_engine = RAGEngine()
+rag_engine = None
+_rag_engine_loaded = False
+
+
+def _get_rag_engine():
+    global rag_engine, _rag_engine_loaded
+    if not _rag_engine_loaded:
+        rag_engine = RAGEngine()
+        _rag_engine_loaded = True
+    return rag_engine
 
 
 @tool
@@ -163,7 +172,7 @@ def ingest_pdf(file_path: str) -> str:
     Args:
         file_path: path to the PDF file
     """
-    return rag_engine.ingest_pdf(file_path)
+    return _get_rag_engine().ingest_pdf(file_path)
 
 
 @tool
@@ -174,7 +183,7 @@ def rag_search(query: str, top_k: int = 3) -> str:
         query: what to search for
         top_k: number of passages to return
     """
-    results = rag_engine.search(query, top_k)
+    results = _get_rag_engine().search(query, top_k)
     return "\n---\n".join(results)
 
 
