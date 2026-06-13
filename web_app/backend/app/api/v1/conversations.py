@@ -34,6 +34,7 @@ class ConversationSummary(BaseModel):
     title: str = Field("新对话", description="会话标题")
     message_count: int = Field(0, description="消息总数")
     last_message: str = Field("", description="最新消息摘要（前 100 字）")
+    doc_count: int = Field(0, description="关联文档数")
     created_at: str = Field("", description="创建时间")
     updated_at: str = Field("", description="最后更新时间")
 
@@ -196,3 +197,32 @@ def delete_conversation(
     if not ok:
         raise HTTPException(status_code=404, detail="会话不存在")
     return {"message": "deleted", "id": conversation_id}
+
+class RenameRequest(BaseModel):
+    """重命名请求"""
+    title: str = Field(..., min_length=1, max_length=256, description="新标题")
+
+
+@router.patch(
+    "/{conversation_id}",
+    summary="重命名会话",
+    description="修改会话标题",
+    responses={
+        200: {"description": "重命名成功"},
+        404: {"description": "会话不存在或无权限"},
+    },
+)
+def rename_conversation(
+    conversation_id: str,
+    body: RenameRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """重命名会话"""
+    ok = cs.update_title(
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        title=body.title,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return {"message": "renamed", "id": conversation_id}

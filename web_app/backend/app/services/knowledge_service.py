@@ -30,13 +30,15 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
-def get_files(user_id: str = None) -> list[dict]:
+def get_files(user_id: str = None, conversation_id: str = None) -> list[dict]:
     """返回当前用户的文档列表（按上传时间倒序）"""
     db = SessionLocal()
     try:
         query = db.query(Document)
         if user_id:
             query = query.filter(Document.user_id == user_id)
+        if conversation_id:
+            query = query.filter(Document.conversation_id == conversation_id)
         docs = query.order_by(Document.created_at.desc()).all()
         return [
             {
@@ -55,7 +57,7 @@ def get_files(user_id: str = None) -> list[dict]:
         db.close()
 
 
-def upload_file(file_path: str, filename: str, user_id: str = None) -> dict:
+def upload_file(file_path: str, filename: str, user_id: str = None, conversation_id: str = None) -> dict:
     """上传：保存记录 -> 建索引 -> 更新 chunk
 
     Args:
@@ -77,6 +79,7 @@ def upload_file(file_path: str, filename: str, user_id: str = None) -> dict:
             filename=filename,
             file_path=file_path,
             file_size=os.path.getsize(file_path),
+            conversation_id=conversation_id,
             index_status="processing",
         )
         db.add(doc)
@@ -84,7 +87,7 @@ def upload_file(file_path: str, filename: str, user_id: str = None) -> dict:
 
         # 2. 调用 rag_service 建索引
         svc = rs.get_rag_service()
-        result = svc.ingest_pdf(file_path, filename, doc_id=doc_id)
+        result = svc.ingest_pdf(file_path, filename, doc_id=doc_id, conversation_id=conversation_id or "")
 
         # 3. 更新文档记录
         doc = db.query(Document).filter(Document.id == doc_id).first()
@@ -186,20 +189,17 @@ def delete_file(doc_id: str, user_id: str = None) -> bool:
         db.close()
 
 
-def search(query: str, top_k: int = 3, user_id: str = None) -> list[dict]:
-    """检索知识库，返回结构化 citation 列表
-
-    TODO (P2): 添加 FAISS multi-tenant filtering
-    当前 FAISS 索引是全局的，所有用户共享。
-    P2 阶段改为：每个用户独立 FAISS 索引，或在 chunk_metadata 中增加 user_id 过滤。
+def search(query: str, top_k: int = 3, user_id: str = None, conversation_id: str = None) -> list[dict]:
+    """检索知识库，返回结构化 citation 列表（支持会话级知识库隔离）
 
     Args:
         query: 检索关键词
         top_k: 返回条数
-        user_id: 保留参数，暂未启用过滤
+        user_id: 保留参数
+        conversation_id: 会话 UUID，用于知识库隔离
     """
     svc = rs.get_rag_service()
-    results = svc.search(query, top_k=top_k)
+    results = svc.search(query, top_k=top_k, conversation_id=conversation_id)
 
     citations = []
     for r in results:

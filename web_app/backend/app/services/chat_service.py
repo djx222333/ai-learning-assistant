@@ -13,20 +13,37 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
-def _get_or_create_conversation(db, session_id, user_id):
+
+def _get_or_create_conversation(db, session_id, user_id, conversation_id=None):
+    # 1) 优先按 conversation_id 查找（确保刷新后标题不丢失）
+    if conversation_id:
+        conv = db.query(Conversation).filter(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+        ).first()
+        if conv:
+            if conv.session_id != session_id:
+                conv.session_id = session_id
+                db.commit()
+            return conv
+
+    # 2) 回退：按 session_id 查找
     conv = db.query(Conversation).filter(
         Conversation.session_id == session_id,
         Conversation.user_id == user_id,
     ).first()
-    if not conv:
-        conv = Conversation(
-            session_id=session_id,
-            user_id=user_id,
-            title="New Conversation",
-        )
-        db.add(conv)
-        db.commit()
-        db.refresh(conv)
+    if conv:
+        return conv
+
+    # 3) 创建新会话
+    conv = Conversation(
+        session_id=session_id,
+        user_id=user_id,
+        title="New Conversation",
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
     return conv
 
 
@@ -37,7 +54,7 @@ def _get_adapter():
         return _a
     return sys.modules['app.services.agent_adapter']
 
-def send_message(message, session_id=None, user_id=None, username=""):
+def send_message(message, session_id=None, user_id=None, username="", conversation_id=None):
     session_id = session_id or f"anon-{user_id or 'default'}"
     citations = []
     source = "llm"
@@ -45,7 +62,7 @@ def send_message(message, session_id=None, user_id=None, username=""):
 
     # Step 1: RAG search (always try first)
     try:
-        raw_citations = knowledge_service.search(message, top_k=3)
+        raw_citations = knowledge_service.search(message, top_k=3, conversation_id=conversation_id)
         scores = [c["relevance_score"] for c in raw_citations] if raw_citations else []
         max_score = max(scores) if scores else 0.0
 
@@ -70,7 +87,7 @@ def send_message(message, session_id=None, user_id=None, username=""):
     # Step 3: Persist to database
     db = SessionLocal()
     try:
-        conv = _get_or_create_conversation(db, session_id, user_id or "")
+        conv = _get_or_create_conversation(db, session_id, user_id or "", conversation_id=conversation_id)
 
         user_msg = Message(
             conversation_id=conv.id,

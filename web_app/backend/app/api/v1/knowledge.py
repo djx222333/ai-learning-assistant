@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """知识库 API 路由"""
 import os
 import uuid
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from pydantic import BaseModel
 from app.models import User
 from app.services import knowledge_service
@@ -28,6 +28,7 @@ class FileItem(BaseModel):
 async def upload_file(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    conversation_id: str = Query(None, description="绑定到指定会话"),
 ):
     """上传 PDF 文件并自动建索引（自动绑定当前用户）"""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -45,6 +46,7 @@ async def upload_file(
         file_path=file_path,
         filename=file.filename,
         user_id=current_user.id,
+        conversation_id=conversation_id,
     )
 
     return FileItem(
@@ -61,9 +63,10 @@ async def upload_file(
 @router.get("/files", response_model=list[FileItem])
 def list_files(
     current_user: User = Depends(get_current_user),
+    conversation_id: str = Query(None, description="按会话过滤"),
 ):
     """获取当前用户已上传的文件列表"""
-    records = knowledge_service.get_files(user_id=current_user.id)
+    records = knowledge_service.get_files(user_id=current_user.id, conversation_id=conversation_id)
     return [
         FileItem(
             id=r["id"],

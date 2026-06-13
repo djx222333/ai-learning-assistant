@@ -14,6 +14,7 @@ from rag_engine import RAGEngine
 from dotenv import load_dotenv
 import os
 import logging
+_logger = logging.getLogger(__name__)
 
 print("[BOOT] agent_graph imported")
 
@@ -249,7 +250,7 @@ search_agent = None
 #   Research: 婢舵碍顐奸幖婊呭偍 閳?娴溿倕寮舵宀冪槈 閳?鐠囩粯鏋冩禒?閳?鏉堟挸鍤幎銉ユ啞
 
 research_prompt = SystemMessage(content="You are a research analyst. Use web_search to gather information from multiple sources, and read_file to examine local reference materials. Organize your findings into a structured report with sections, key findings, and source citations. If initial search results are insufficient, try different search keywords to get comprehensive coverage.")
-search_agent = None
+research_agent = None
 
 
 # ---------- RAG Agent ----------
@@ -267,6 +268,55 @@ rag_prompt = SystemMessage(content="You are a document Q&A assistant. When the u
 rag_agent = None
 
 # ============================================================
+
+# ============================================================
+# Lazy Agent Initialization
+# All agents are created on first call, not at import time.
+# This ensures uvicorn can start even without an API key.
+# ============================================================
+def _ensure_agents():
+    """Lazily initialize all sub-agents if not already created."""
+    global code_agent, english_agent, career_agent
+    global search_agent, research_agent, rag_agent
+
+    if code_agent is not None:
+        return  # already initialized
+
+    llm = get_llm()
+    if llm is None:
+        _logger.warning("LLM not available - agents will run without tools")
+        return  # cannot create agents without LLM
+
+    code_agent = create_react_agent(
+        llm,
+        [read_profile, calculator, read_file, update_profile],
+        prompt=code_prompt,
+    )
+    english_agent = create_react_agent(
+        llm,
+        [],
+        prompt=english_prompt,
+    )
+    career_agent = create_react_agent(
+        llm,
+        [read_profile, update_profile],
+        prompt=career_prompt,
+    )
+    search_agent = create_react_agent(
+        llm,
+        [web_search],
+        prompt=search_prompt,
+    )
+    research_agent = create_react_agent(
+        llm,
+        [web_search, read_file],
+        prompt=research_prompt,
+    )
+    rag_agent = create_react_agent(
+        llm,
+        [ingest_pdf, rag_search],
+        prompt=rag_prompt,
+    )
 # Part 5: Supervisor Node
 # Supervisor classifies the question and returns next_agent
 # ============================================================

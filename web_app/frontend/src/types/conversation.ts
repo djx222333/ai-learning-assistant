@@ -1,11 +1,9 @@
-// 对话历史类型定义
-// 对应后端 GET /api/v1/conversations 响应
-
-export interface ConversationItem {
+﻿export interface ConversationItem {
   id: string;
   session_id: string;
   title: string;
   message_count: number;
+  doc_count: number;
   last_message?: string;
   created_at: string;
   updated_at: string;
