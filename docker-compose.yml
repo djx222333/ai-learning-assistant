@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # AI Learning Assistant - Docker Compose
 # ============================================================
 # Usage:
@@ -58,7 +58,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ai_assistant}:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/${POSTGRES_DB:-ai_assistant}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-52428800}
@@ -94,3 +94,4 @@ volumes:
     driver: local
   backend_data:
     driver: local
+

@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # .gitignore — AI Learning Assistant
 # ============================================================
 
@@ -88,3 +88,39 @@ migrate_data.py
 GITHUB_PUBLISH_REPORT.md
 AUDIT_*.md
 README_PRO.md
+
+# ---- Runtime Logs ----
+uvicorn_log*.txt
+vite_log*.txt
+vite_stdout*.txt
+
+# ---- Temporary Scripts ----
+fix_*.py
+
+# ---- Docker Environment ----
+.env.production
+
+# ---- FAISS Index Files ----
+rag_index/
+!rag_index/.gitkeep
+
+# ---- Runtime Logs ----
+*.err
+*.out
+backend/*_err.txt
+backend/*_out.txt
+test*.txt
+
+# ---- Debug Scripts ----
+debug_*.py
+check_*.py
+probe_*.py
+verify*.py
+step*.py
+test_patch*.py
+
+# ---- Temp Files ----
+backend/uvicorn_log*.txt
+vite_stdout*.txt
+FINAL_COMMIT_CHECKLIST.md
+RELEASE_CANDIDATE_REPORT.md

@@ -1,4 +1,4 @@
-import http from "./http";
+﻿import http from "./http";
 
 export interface KnowledgeFile {
   id: string;
@@ -10,15 +10,19 @@ export interface KnowledgeFile {
   created_at: string;
 }
 
-export async function getFiles(): Promise<KnowledgeFile[]> {
-  const resp = await http.get("/v1/knowledge/files");
+export async function getFiles(conversationId?: string): Promise<KnowledgeFile[]> {
+  const params: Record<string, string> = {};
+  if (conversationId) params.conversation_id = conversationId;
+  const resp = await http.get("/v1/knowledge/files", { params });
   return resp.data;
 }
 
-export async function uploadFile(file: File): Promise<KnowledgeFile> {
+export async function uploadFile(file: File, conversationId?: string): Promise<KnowledgeFile> {
   const form = new FormData();
   form.append("file", file);
-  const resp = await http.post("/v1/knowledge/upload", form);
+  const params: Record<string, string> = {};
+  if (conversationId) params.conversation_id = conversationId;
+  const resp = await http.post("/v1/knowledge/upload", form, { params });
   return resp.data;
 }
 

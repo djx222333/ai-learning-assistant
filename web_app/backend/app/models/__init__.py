@@ -85,6 +85,7 @@ class Conversation(Base):
 
     # 关系
     user = relationship("User", back_populates="conversations")
+    documents = relationship("Document", back_populates="conversation")
     messages = relationship(
         "Message", back_populates="conversation",
         order_by="Message.created_at",
@@ -160,6 +161,7 @@ class Document(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    conversation_id = Column(String(36), ForeignKey("conversations.id"), nullable=True, index=True)
     filename = Column(String(256), nullable=False)
     file_path = Column(String(512), nullable=False)
     file_size = Column(Integer, default=0)
@@ -172,6 +174,7 @@ class Document(Base):
 
     # 关系
     user = relationship("User", back_populates="documents")
+    conversation = relationship("Conversation", back_populates="documents")
     chunks = relationship(
         "Chunk", back_populates="document",
         order_by="Chunk.chunk_index",
@@ -293,3 +296,4 @@ class Task(Base):
 
     def __repr__(self):
         return f"<Task {self.order}: {self.agent_type} [{self.status}]>"
+

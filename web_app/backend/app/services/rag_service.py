@@ -93,16 +93,16 @@ class RAGService:
 
     # ---------- Public API ----------
 
-    def ingest_pdf(self, file_path: str, filename: str, doc_id: str = "") -> dict:
+    def ingest_pdf(self, file_path: str, filename: str, doc_id: str = "", conversation_id: str = "") -> dict:
         """PDF → 切块 → Embed → 建索引 → 记录元数据
 
         Args:
             file_path: PDF 文件绝对路径
             filename: 原始文件名（用于 citation 展示）
             doc_id: 文档 UUID（用于 delete 时匹配）
+            conversation_id: 会话 UUID（用于知识库隔离）
 
         Returns:
-        TODO (P2): Add FAISS multi-tenant filtering - filter by user_id
             {"status": "ok/error", "chunk_count": N, "page_count": N}
         """
         old_count = len(self._engine.chunks)
@@ -127,6 +127,7 @@ class RAGService:
                 "text": self._engine.chunks[i],
                 "document_name": filename,
                 "doc_id": doc_id,  # UUID，用于 delete 匹配
+                "conversation_id": conversation_id,  # UUID，用于知识库隔离
                 "chunk_index": i,
             })
 
@@ -139,11 +140,15 @@ class RAGService:
 
         return {"status": "ok", "chunk_count": added_count, "page_count": page_count}
 
-    def search(self, query: str, top_k: int = 3, user_id: str = None) -> list[dict]:
-        """检索，返回结构化结果
+    def search(self, query: str, top_k: int = 3, user_id: str = None, conversation_id: str = None) -> list[dict]:
+        """检索，返回结构化结果（支持按会话过滤）
 
         分数归一化: score = 1 / (1 + l2_distance)
         L2 越小 -> score 越接近 1
+
+        知识库隔离策略：
+        如果传入了 conversation_id，搜索更多候选（top_k * 3），
+        然后按 conversation_id 过滤，再取 TopK。
         """
         if self._engine.index is None or not self._engine.chunks or not self._metadata:
             return []
@@ -151,17 +156,22 @@ class RAGService:
         # 1. Embed 问题
         q_vec = self._engine.embedder.encode([query])
 
-        # 2. FAISS 搜索
-        k = min(top_k, len(self._engine.chunks))
-        distances, indices = self._engine.index.search(q_vec.astype(np.float32), k)
+        # 2. FAISS 搜索（如果按会话过滤，搜索更多候选）
+        search_k = min(top_k * 3 if conversation_id else top_k, len(self._engine.chunks))
+        distances, indices = self._engine.index.search(q_vec.astype(np.float32), search_k)
 
-        # 3. 映射到元数据
+        # 3. 映射到元数据 + 按 conversation_id 过滤
         results = []
         for i, idx in enumerate(indices[0]):
             if idx < 0 or idx >= len(self._metadata):
                 continue
 
             meta = self._metadata[idx]
+
+            # 按会话过滤
+            if conversation_id and meta.get("conversation_id") != conversation_id:
+                continue
+
             l2_distance = float(distances[0][i])
             score = round(1.0 / (1.0 + l2_distance), 4)
 
@@ -174,8 +184,9 @@ class RAGService:
                 "l2_distance": round(l2_distance, 4),
             })
 
+        # 4. 按分数排序 + 截取 TopK
         results.sort(key=lambda r: r["relevance_score"], reverse=True)
-        return results
+        return results[:top_k]
 
     def delete_document(self, doc_id: str) -> bool:
         """删除指定文档的所有 chunk，重建索引

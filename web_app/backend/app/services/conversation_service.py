@@ -13,6 +13,7 @@
 - cascade="all, delete-orphan" 自动级联删除
 """
 from app.database import SessionLocal
+from datetime import datetime, timezone
 from app.models import Conversation, Message
 
 
@@ -69,11 +70,18 @@ def list_conversations(
             if last_msg:
                 last_message = last_msg.content[:100]
 
+            from app.models import Document
+            doc_count = (
+                db.query(Document)
+                .filter(Document.conversation_id == conv.id)
+                .count()
+            )
             items.append({
                 "id": conv.id,
                 "session_id": conv.session_id,
                 "title": conv.title or "新对话",
                 "message_count": conv.message_count or 0,
+                "doc_count": doc_count,
                 "last_message": last_message,
                 "created_at": conv.created_at.isoformat() if conv.created_at else "",
                 "updated_at": conv.updated_at.isoformat() if conv.updated_at else "",
@@ -221,6 +229,32 @@ def delete_conversation(conversation_id: str, user_id: str) -> bool:
 
         db.delete(conv)  # cascade 自动删除 messages
         db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+def update_title(conversation_id: str, user_id: str, title: str) -> bool:
+    """重命名会话（校验用户归属）"""
+    db = SessionLocal()
+    try:
+        conv = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id,
+            )
+            .first()
+        )
+        if not conv:
+            return False
+        conv.title = title
+        # 触发 updated_at onupdate
+        conv.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(conv)
         return True
     except Exception:
         db.rollback()

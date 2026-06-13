@@ -1,4 +1,4 @@
-import http from "./http";
+﻿import http from "./http";
 import type {
   PaginatedConversations,
   PaginatedMessages,
@@ -30,4 +30,11 @@ export async function deleteConversation(
   conversationId: string
 ): Promise<void> {
   await http.delete(`/v1/conversations/${conversationId}`);
+}
+
+export async function renameConversation(
+  conversationId: string,
+  title: string
+): Promise<void> {
+  await http.patch(`/v1/conversations/${conversationId}`, { title });
 }

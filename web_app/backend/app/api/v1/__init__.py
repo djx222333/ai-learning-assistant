@@ -1,1 +1,1 @@
-﻿from . import chat, knowledge, plans, tasks, reports
+from . import auth, chat, knowledge, plans, tasks, reports, conversations

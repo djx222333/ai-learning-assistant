@@ -11,12 +11,16 @@ import {
 interface HistorySidebarProps {
   /** 当前会话 ID（用于高亮） */
   currentSessionId: string;
+  /** 当前 conversation ID */
+  currentConvId?: string;
   /** 切换到指定会话 */
   onSelectSession: (sessionId: string, convId: string) => void;
   /** 新建会话 */
   onNewSession: () => void;
   /** 刷新会话列表的外部触发器 */
   refreshTrigger: number;
+  /** 知识库外部刷新触发器 */
+  knowledgeRefreshTrigger?: number;
 }
 
 // 格式化时间：今天显示 HH:MM，昨天显示"昨天"，更早显示 MM-DD
@@ -28,6 +32,7 @@ function formatTime(dateStr: string): string {
     const day = 24 * 60 * 60 * 1000;
     if (diff < day) return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
     if (diff < 2 * day) return "昨天";
+    if (diff < 7 * day) return `${Math.floor(diff / day)}天前`;
     return `${d.getMonth() + 1}-${d.getDate()}`;
   } catch {
     return "";
