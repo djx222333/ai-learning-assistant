@@ -23,6 +23,10 @@ function formatStatus(status: string): { label: string; color: string } {
   }
 }
 
+function safeArray(arr: any): any[] {
+  return Array.isArray(arr) ? arr : [];
+}
+
 interface Props {
   /** 外部触发刷新（上传完成后） */
   refreshTrigger: number;
@@ -40,7 +44,7 @@ export default function ChatKnowledgePanel({ refreshTrigger, conversationId }: P
     setLoading(true);
     try {
       const data = await getFiles(conversationId);
-      setFiles(data);
+      setFiles(Array.isArray(data) ? data : []);
     } catch {
       // ignore
     } finally {
@@ -85,7 +89,7 @@ export default function ChatKnowledgePanel({ refreshTrigger, conversationId }: P
     }
   };
 
-  const readyCount = files.filter((f) => f.index_status === "ready").length;
+  const readyCount = safeArray(files).filter((f) => f.index_status === "ready").length;
 
   return (
     <div className="border-t border-gray-200">
@@ -95,7 +99,7 @@ export default function ChatKnowledgePanel({ refreshTrigger, conversationId }: P
         className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
       >
         <span className="font-medium">
-          📚 知识库 {files.length > 0 && `(${readyCount}/${files.length})`}
+          📚 知识库 {safeArray(files).length > 0 && `(${readyCount}/${files.length})`}
         </span>
         <span className="text-gray-300">{expanded ? "▼" : "▶"}</span>
       </button>
@@ -132,11 +136,11 @@ export default function ChatKnowledgePanel({ refreshTrigger, conversationId }: P
           {/* File list */}
           {loading ? (
             <div className="text-center py-3 text-xs text-gray-400">加载中...</div>
-          ) : files.length === 0 ? (
+          ) : safeArray(files).length === 0 ? (
             <div className="text-center py-3 text-xs text-gray-300">暂无文档</div>
           ) : (
             <div className="mt-1 space-y-1 max-h-48 overflow-y-auto">
-              {files.map((f) => {
+              {safeArray(files).map((f) => {
                 const st = formatStatus(f.index_status);
                 return (
                   <div key={f.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group transition-colors">

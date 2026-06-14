@@ -192,7 +192,7 @@ const handleSend = useCallback(
                 </div>
               </div>
             ) : (
-              <>
+              <div className="min-h-0">
                 {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
                 {loading && (
                   <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
@@ -205,7 +205,7 @@ const handleSend = useCallback(
                   </div>
                 )}
                 <div ref={bottomRef} />
-              </>
+              </div>
             )}
 
           </div>
