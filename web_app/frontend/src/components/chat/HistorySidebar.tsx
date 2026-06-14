@@ -7,6 +7,7 @@ import {
   listConversations,
   deleteConversation,
 } from "../../api/conversations";
+import ChatKnowledgePanel from "./ChatKnowledgePanel";
 
 interface HistorySidebarProps {
   /** 当前会话 ID（用于高亮） */
@@ -48,6 +49,7 @@ function simplifyTitle(item: ConversationItem): string {
 
 export default function HistorySidebar({
   currentSessionId,
+  currentConvId,
   onSelectSession,
   onNewSession,
   refreshTrigger,
@@ -245,6 +247,7 @@ export default function HistorySidebar({
             })}
           </div>
         )}
+        <ChatKnowledgePanel refreshTrigger={0} conversationId={currentConvId} />
       </aside>
     </>
   );
